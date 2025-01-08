@@ -12,7 +12,7 @@
 - **Dependency Management**: Automatically start dependent services.
 - **Health Checks**: Define custom health checks for services.
 - **Log Rotation**: Automatically rotate logs for better management.
-- **Multi-Arch Support**: Pre-compiled binaries for AMD64, ARM, and x86.
+- **Multi-Arch Support**: Pre-compiled binaries for AMD64, ARM64, and x86.
 
 ---
 
@@ -43,7 +43,8 @@ Download the latest release from the [Releases page](https://github.com/codjix/c
 
 ```yml
 Usage: codjixd <command> [<service>]
-Commands: start <service>    Start a service
+Commands:
+  start <service>    Start a service
   stop <service>     Stop a service
   restart <service>  Restart a service
   status <service>   Show status and metrics for a service
