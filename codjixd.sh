@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Configuration
 CONFIG_FILE="/etc/codjixd.conf"
