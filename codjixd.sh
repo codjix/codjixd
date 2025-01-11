@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Configuration
 CONFIG_FILE="/etc/codjixd.conf"
@@ -6,7 +6,7 @@ BASE_DIR="${BASE_DIR:-/opt/codjixd}"
 LOG_DIR="${LOG_DIR:-${BASE_DIR}/logs}"
 PID_DIR="${PID_DIR:-${BASE_DIR}/pids}"
 SERVICES_DIR="${SERVICES_DIR:-${BASE_DIR}/services}"
-VERSION="1.0.0"
+VERSION="1.0.1"
 
 # Load configuration file if it exists
 [ -f "$CONFIG_FILE" ] && source "$CONFIG_FILE"
@@ -29,19 +29,19 @@ is_running() {
 # Rotate logs: move current logs to .old and start a new log file
 rotate_logs() {
     if [ -f "$LOG_FILE.log" ]; then
-        echo -e "\n=== Log session end ===\n\n\n" >> "$LOG_FILE.log"
+        echo -e "\n=== Log session end ===\n" >> "$LOG_FILE.log"
         cat "$LOG_FILE.log" >> "${LOG_FILE}.old.log"
     fi
     echo -e "=== Log session started at $(date) ===\n" > "$LOG_FILE.log"
 }
 
-# Load dependencies defined in the service script
+# Load dependencies if defined in the service script
 load_dependencies() {
-    if source "$SERVICE_SCRIPT" &> /dev/null && [ -n "${DEPENDENCIES[@]}" ]; then
-        for dependency in "${DEPENDENCIES[@]}"; do
+    if source "$SERVICE_SCRIPT" &> /dev/null && [ -n "${depend_on[@]}" ]; then
+        for dependency in "${depend_on[@]}"; do
             echo "[o] Loading dependency: $dependency"
-            # Start the dependency synchronously
-            "$0" start "$dependency"
+            # Start the dependency synchronously in a new session
+            setsid "$0" start "$dependency"
         done
     fi
 }
@@ -49,11 +49,14 @@ load_dependencies() {
 # Run a health check if defined in the service script
 run_health_check() {
     if source "$SERVICE_SCRIPT" &> /dev/null && declare -f health_check > /dev/null; then
-        if health_check; then
-            echo "[o] Service $SERVICE_NAME is healthy."
-        else
-            echo "[x] Service $SERVICE_NAME is not healthy."
-        fi
+        while true; do
+            sleep 5
+            if health_check; then
+                echo "[o] Service $SERVICE_NAME is healthy."
+            else
+                echo "[x] Service $SERVICE_NAME is not healthy."
+            fi
+        done
     fi
 }
 
@@ -71,7 +74,7 @@ start_service() {
         PID=$!
         echo "$PID" > "$PID_FILE"
         echo "[o] Service $SERVICE_NAME started (PID: $PID)."
-        run_health_check
+        run_health_check >> "$LOG_FILE.log" 2>&1 &
     else
         echo "[x]: Service $SERVICE_NAME requires a start function."
     fi
@@ -89,6 +92,17 @@ stop_service() {
     kill -9 -- -"$PGID"
     rm -f "$PID_FILE"
     echo "[o] Service $SERVICE_NAME stopped."
+}
+
+# Kill a service and its dependencies
+kill_service() {
+    stop_service
+    if source "$SERVICE_SCRIPT" &> /dev/null && [ -n "${depend_on[@]}" ]; then
+        for dependency in "${depend_on[@]}"; do
+            echo "[x] Killing dependency: $dependency"
+            "$0" kill "$dependency"
+        done
+    fi
 }
 
 # Restart a service
@@ -112,12 +126,26 @@ show_status() {
 
 # Tail the logs of a service
 tail_logs() {
-    if [ ! -f "$LOG_FILE.log" ]; then
+    # read option: .log or .old.log
+    echo "[o] Tailing logs for service: $SERVICE_NAME"
+    echo '[o] Press "h" to show help, "q" to stop it'
+    echo -e '[o] Press "F" for live logs, "CTRL + C" to stop it\n'
+    echo "1. Current run logs"
+    echo "2. Old history logs"
+    echo "3. Cancel"
+    read -p "Choose an option [1]: " option
+    option="${option:-1}"
+    case "$option" in
+        1) option="$LOG_FILE.log" ;;
+        2) option="$LOG_FILE.old.log" ;;
+        3) return 0 ;;
+        *) echo "[x] Invalid option: $option" && return 1 ;;
+    esac
+    if [ ! -f "$option" ]; then
         echo "[x] No logs for $SERVICE_NAME."
         return 1
     fi
-    echo "[o] Use CTRL + C to stop logs"
-    tail -f "$LOG_FILE.log"
+    less -M "$option" 
 }
 
 # List all available services
@@ -162,9 +190,10 @@ case "$ACTION" in
     start) safe_service start_service ;;
     stop) safe_service stop_service ;;
     restart) safe_service restart_service ;;
+    kill) safe_service kill_service ;;
     status) safe_service show_status ;;
     logs) safe_service tail_logs ;;
-    list) list_services ;;
+    list|ls) list_services ;;
     version|-v|--version) 
         echo "Codjixd v$VERSION"
         ;;
@@ -174,9 +203,10 @@ case "$ACTION" in
         echo "  start <service>    Start a service"
         echo "  stop <service>     Stop a service"
         echo "  restart <service>  Restart a service"
+        echo "  kill <service>     Kill a service and its dependencies"
         echo "  status <service>   Show status and metrics for a service"
         echo "  logs <service>     Tail logs for a service"
-        echo "  list               List all available services"
+        echo "  list, ls           List all available services"
         echo "  version            Show version information"
         echo "  help               Show this help message"
         echo "Options:"
