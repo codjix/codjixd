@@ -126,26 +126,31 @@ show_status() {
 
 # Tail the logs of a service
 tail_logs() {
-    # read option: .log or .old.log
     echo "[o] Tailing logs for service: $SERVICE_NAME"
     echo '[o] Press "h" to show help, "q" to stop it'
     echo -e '[o] Press "F" for live logs, "CTRL + C" to stop it\n'
     echo "1. Current run logs"
     echo "2. Old history logs"
-    echo "3. Cancel"
+    echo "3. Live logs"
+    echo "4. Clean up logs"
+    echo "0. Cancel"
     read -p "Choose an option [1]: " option
     option="${option:-1}"
+    args=""
     case "$option" in
+        0) return 0 ;;
         1) option="$LOG_FILE.log" ;;
         2) option="$LOG_FILE.old.log" ;;
-        3) return 0 ;;
+        3) option="$LOG_FILE.log" && args="+F" ;;
+        4) rm -f $LOG_FILE.{log,old.log} > /dev/null && \
+           echo "[o] Done" && exit 0 ;;
         *) echo "[x] Invalid option: $option" && return 1 ;;
     esac
     if [ ! -f "$option" ]; then
         echo "[x] No logs for $SERVICE_NAME."
         return 1
     fi
-    less -M "$option" 
+    less -M $args "$option"
 }
 
 # List all available services
