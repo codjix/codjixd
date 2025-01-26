@@ -6,7 +6,7 @@ BASE_DIR="${BASE_DIR:-/opt/codjixd}"
 LOG_DIR="${LOG_DIR:-${BASE_DIR}/logs}"
 PID_DIR="${PID_DIR:-${BASE_DIR}/pids}"
 SERVICES_DIR="${SERVICES_DIR:-${BASE_DIR}/services}"
-VERSION="1.0.1"
+VERSION="1.0.2"
 
 # Load configuration file if it exists
 [ -f "$CONFIG_FILE" ] && source "$CONFIG_FILE"

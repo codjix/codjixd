@@ -27,4 +27,4 @@ jobs:
           push: true
           tags: |
             codjix/codjixd:latest
-            codjix/codjixd:1.0.1
+            codjix/codjixd:1.0.2
